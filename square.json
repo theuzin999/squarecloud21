@@ -1,0 +1,11 @@
+{
+  "name": "goathbot-aviator",
+  "version": "1.0.0",
+  "start": "python3 bot_secure_relogin.py",
+  "type": "python",
+  "web": true,
+  "apt": [
+    "chromium",
+    "chromium-chromedriver"
+  ]
+}
