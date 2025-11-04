@@ -89,34 +89,36 @@ def initialize_game_elements(driver):
         '//iframe[contains(@src, "aviator-game")]'
     ]
     
-    # LISTA DE SELETORES EXPANDIDA E MAIS ROBUSTA
+    # =============================================================
+    # ⚠️ OTIMIZAÇÃO CRÍTICA DO DELAY ⚠️
+    # Movendo o seletor que funcionou (.result-history) para o topo.
+    # =============================================================
     POSSIVEIS_HISTORICOS = [
-        # 🆕 NOVO SELETOR ADICIONADO PARA MAIOR ROBUSTEZ
-        ('.round-history-button-1-x', By.CSS_SELECTOR),
+        # 1. O SELETOR QUE FUNCIONOU NO SEU LOG:
+        ('.result-history', By.CSS_SELECTOR),
         
-        # Seletores CSS (mais comuns)
+        # 2. OUTROS SELETORES (Fallback)
+        ('.round-history-button-1-x', By.CSS_SELECTOR),
         ('.rounds-history', By.CSS_SELECTOR),
         ('.history-list', By.CSS_SELECTOR),
         ('.multipliers-history', By.CSS_SELECTOR),
-        ('.result-history', By.CSS_SELECTOR),
         ('[data-testid="history"]', By.CSS_SELECTOR),
         ('.game-history', By.CSS_SELECTOR),
-        # Seletores de fallback
         ('.bet-history', By.CSS_SELECTOR),
         ('div[class*="recent-list"]', By.CSS_SELECTOR),
         ('ul.results-list', By.CSS_SELECTOR),
         ('div.history-block', By.CSS_SELECTOR),
         ('div[class*="history-container"]', By.CSS_SELECTOR),
-        # Seletores XPath genéricos (última tentativa)
-        ('//div[contains(@class, "history")]', By.XPATH),
+        ('//div[contains(@class, "history")]', By.XPATH), # Este também funcionou, mas o CSS é mais rápido
         ('//div[contains(@class, "rounds-list")]', By.XPATH)
     ]
+    # =============================================================
 
     iframe = None
     for xpath in POSSIVEIS_IFRAMES:
         try:
             driver.switch_to.default_content() 
-            # ⬇️ OTIMIZAÇÃO A: REDUZIDO DE 10S PARA 7S
+            # ⬇️ REDUZIDO O TIMEOUT (para falhar mais rápido se o iframe demorar)
             iframe = WebDriverWait(driver, 7).until(
                 EC.presence_of_element_located((By.XPATH, xpath))
             )
@@ -133,7 +135,7 @@ def initialize_game_elements(driver):
     historico_elemento = None
     for selector, by_method in POSSIVEIS_HISTORICOS:
         try:
-            # ⬇️ OTIMIZAÇÃO B: REDUZIDO DE 7S PARA 5S
+            # ⬇️ REDUZIDO O TIMEOUT (para falhar mais rápido se o seletor demorar)
             historico_elemento = WebDriverWait(driver, 5).until(
                 EC.presence_of_element_located((by_method, selector))
             )
