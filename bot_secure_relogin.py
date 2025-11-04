@@ -91,7 +91,7 @@ def initialize_game_elements(driver):
     
     # LISTA DE SELETORES EXPANDIDA E MAIS ROBUSTA
     POSSIVEIS_HISTORICOS = [
-        # 🆕 SELETOR ADICIONADO QUE ESTAVA FALTANDO NA SUA VERSÃO ATUAL
+        # 🆕 NOVO SELETOR ADICIONADO PARA MAIOR ROBUSTEZ
         ('.round-history-button-1-x', By.CSS_SELECTOR),
         
         # Seletores CSS (mais comuns)
@@ -214,7 +214,7 @@ def process_login(driver):
 def start_driver():
     """
     Inicializa o driver do Chrome.
-    ✅ CORRIGIDO: Adaptado para a Square Cloud, usando o ChromeDriver instalado via APT.
+    ⚠️ CORRIGIDO: Adaptado para a Square Cloud, usando o ChromeDriver instalado via APT.
     """
     options = webdriver.ChromeOptions()
     options.add_argument("--no-sandbox")
@@ -222,12 +222,11 @@ def start_driver():
     options.add_argument("--disable-extensions")
     options.add_argument("--disable-popup-blocking")
     options.add_argument("--disable-blink-features=AutomationControlled")
-    # ⚠️ CRÍTICO: Adicionado Headless
+    # NECESSÁRIO para servidores sem interface gráfica
     options.add_argument("--headless") 
     options.add_argument("--window-size=1920,1080")
-    # ⚠️ REMOVIDO: options.add_argument("--start-maximized")
     
-    # ⚠️ CRÍTICO: Usando o caminho local da Square Cloud, não o ChromeDriverManager()
+    # ⚠️ Aponta para o local onde o `chromium-chromedriver` é instalado (via `square.json`)
     service = Service("/usr/lib/chromium-browser/chromedriver") 
     
     return webdriver.Chrome(service=service, options=options)
@@ -363,14 +362,13 @@ def start_bot(relogin_done_for: date = None):
                     ULTIMO_ENVIO = time()
                     ULTIMO_MULTIPLIER_TIME = time() # Reseta o timer de inatividade
             
-            # ⚠️ CRÍTICO: REMOVIDO driver.switch_to.default_content(). 
-            # Manter o foco no iframe para evitar congelamentos e erros StaleElement.
+            # ⚠️ LINHA REMOVIDA PARA ESTABILIDADE: Mantenha o foco no iframe durante o polling.
             # driver.switch_to.default_content()
             sleep(POLLING_INTERVAL)
 
         except (StaleElementReferenceException, TimeoutException):
             print("⚠️ Elemento histórico obsoleto/sumiu. Recarregando elementos...")
-            # Não é necessário chamar switch_to.default_content() aqui, pois initialize_game_elements já faz isso.
+            # Como initialize_game_elements já lida com o switch_to.default_content(), deixamos assim:
             iframe, hist = initialize_game_elements(driver)
             continue
 
