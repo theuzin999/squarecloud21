@@ -116,7 +116,8 @@ def initialize_game_elements(driver):
     for xpath in POSSIVEIS_IFRAMES:
         try:
             driver.switch_to.default_content() 
-            iframe = WebDriverWait(driver, 10).until(
+            # ⬇️ OTIMIZAÇÃO A: REDUZIDO DE 10S PARA 7S
+            iframe = WebDriverWait(driver, 7).until(
                 EC.presence_of_element_located((By.XPATH, xpath))
             )
             driver.switch_to.frame(iframe)
@@ -132,7 +133,8 @@ def initialize_game_elements(driver):
     historico_elemento = None
     for selector, by_method in POSSIVEIS_HISTORICOS:
         try:
-            historico_elemento = WebDriverWait(driver, 7).until(
+            # ⬇️ OTIMIZAÇÃO B: REDUZIDO DE 7S PARA 5S
+            historico_elemento = WebDriverWait(driver, 5).until(
                 EC.presence_of_element_located((by_method, selector))
             )
             print(f"✅ Seletor de histórico encontrado: {selector} ({by_method})")
@@ -206,7 +208,7 @@ def process_login(driver):
         driver.get(LINK_AVIATOR)
         print("ℹ️ Indo direto para o Aviator via link.")
         
-    # ⬆️ TEMPO DE ESPERA AUMENTADO para garantir o carregamento do histórico
+    # ⬆️ MANTIDO O TEMPO DE ESPERA ALTO (15s) para o jogo carregar antes da busca
     sleep(15) 
     
     return True
@@ -214,7 +216,7 @@ def process_login(driver):
 def start_driver():
     """
     Inicializa o driver do Chrome.
-    ⚠️ CORRIGIDO: Adaptado para a Square Cloud, usando o ChromeDriver instalado via APT.
+    ⚠️ CRÍTICO: Adaptado para a Square Cloud, usando o ChromeDriver instalado via APT.
     """
     options = webdriver.ChromeOptions()
     options.add_argument("--no-sandbox")
@@ -226,7 +228,7 @@ def start_driver():
     options.add_argument("--headless") 
     options.add_argument("--window-size=1920,1080")
     
-    # ⚠️ Aponta para o local onde o `chromium-chromedriver` é instalado (via `square.json`)
+    # ⚠️ CRÍTICO: Usando o caminho local da Square Cloud
     service = Service("/usr/lib/chromium-browser/chromedriver") 
     
     return webdriver.Chrome(service=service, options=options)
@@ -362,13 +364,11 @@ def start_bot(relogin_done_for: date = None):
                     ULTIMO_ENVIO = time()
                     ULTIMO_MULTIPLIER_TIME = time() # Reseta o timer de inatividade
             
-            # ⚠️ LINHA REMOVIDA PARA ESTABILIDADE: Mantenha o foco no iframe durante o polling.
-            # driver.switch_to.default_content()
+            # Mantenha o foco no iframe durante o polling.
             sleep(POLLING_INTERVAL)
 
         except (StaleElementReferenceException, TimeoutException):
             print("⚠️ Elemento histórico obsoleto/sumiu. Recarregando elementos...")
-            # Como initialize_game_elements já lida com o switch_to.default_content(), deixamos assim:
             iframe, hist = initialize_game_elements(driver)
             continue
 
