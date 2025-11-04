@@ -1,6 +1,6 @@
 {
-  "name": "goathbot-aviator",
-  "version": "1.0.0",
+  "name": "...",
+  "version": "...",
   "start": "python3 bot_secure_relogin.py",
   "type": "python",
   "web": true,
