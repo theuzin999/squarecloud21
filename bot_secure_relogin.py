@@ -4,7 +4,6 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 # ⚠️ Removido: from webdriver_manager.chrome import ChromeDriverManager 
-# (Não é mais necessário, pois usamos o caminho local do Square Cloud)
 from time import sleep, time
 from datetime import datetime, date
 from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
@@ -91,7 +90,7 @@ def initialize_game_elements(driver):
     
     # LISTA DE SELETORES EXPANDIDA E MAIS ROBUSTA
     POSSIVEIS_HISTORICOS = [
-        # 🆕 ADICIONADO UM SELETOR COMUM
+        # 🆕 NOVO SELETOR ADICIONADO PARA MAIOR ROBUSTEZ
         ('.round-history-button-1-x', By.CSS_SELECTOR),
         
         # Seletores CSS (mais comuns)
@@ -206,7 +205,7 @@ def process_login(driver):
         driver.get(LINK_AVIATOR)
         print("ℹ️ Indo direto para o Aviator via link.")
     
-    # ⬆️ AUMENTADO O TEMPO DE ESPERA para garantir o carregamento do histórico
+    # ⬆️ TEMPO DE ESPERA AUMENTADO para garantir o carregamento do histórico
     sleep(15) 
     
     return True
@@ -295,7 +294,7 @@ def start_bot(relogin_done_for: date = None):
             # =========================================
 
 
-            # === RECONEXÃO COM IFRAME ===
+            # === GARANTE QUE ESTAMOS NO IFRAME ANTES DE LER ===
             try:
                 # O switch_to.frame deve ocorrer antes de acessar hist
                 driver.switch_to.frame(iframe) 
@@ -309,7 +308,6 @@ def start_bot(relogin_done_for: date = None):
                     return start_bot() 
 
             # === LEITURA DOS RESULTADOS ===
-            # O timeout de 7 segundos em initialize_game_elements pode ter sido a causa do congelamento
             resultados_texto = hist.text.strip() if hist else ""
             if not resultados_texto:
                 falhas += 1
@@ -363,13 +361,13 @@ def start_bot(relogin_done_for: date = None):
                     ULTIMO_ENVIO = time()
                     ULTIMO_MULTIPLIER_TIME = time() # Reseta o timer de inatividade
             
-            # Volta para o conteúdo principal antes de esperar o polling (boa prática)
-            driver.switch_to.default_content()
+            # ⚠️ LINHA REMOVIDA/COMENTADA: driver.switch_to.default_content()
+            # Mantenha o foco no iframe para leituras rápidas
             sleep(POLLING_INTERVAL)
 
         except (StaleElementReferenceException, TimeoutException):
             print("⚠️ Elemento histórico obsoleto/sumiu. Recarregando elementos...")
-            driver.switch_to.default_content()
+            # Não precisa de switch_to.default_content() aqui, pois já será feito em initialize_game_elements
             iframe, hist = initialize_game_elements(driver)
             continue
 
