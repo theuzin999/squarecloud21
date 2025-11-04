@@ -3,7 +3,8 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
-from webdriver_manager.chrome import ChromeDriverManager
+# ⚠️ Removido: from webdriver_manager.chrome import ChromeDriverManager 
+# (Não é mais necessário, pois usamos o caminho local do Square Cloud)
 from time import sleep, time
 from datetime import datetime, date
 from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
@@ -90,6 +91,9 @@ def initialize_game_elements(driver):
     
     # LISTA DE SELETORES EXPANDIDA E MAIS ROBUSTA
     POSSIVEIS_HISTORICOS = [
+        # 🆕 ADICIONADO UM SELETOR COMUM
+        ('.round-history-button-1-x', By.CSS_SELECTOR),
+        
         # Seletores CSS (mais comuns)
         ('.rounds-history', By.CSS_SELECTOR),
         ('.history-list', By.CSS_SELECTOR),
@@ -137,7 +141,7 @@ def initialize_game_elements(driver):
             continue
 
     if not historico_elemento:
-        print("⚠️ Nenhum seletor de histórico encontrado!")
+        print("⚠️ Nenhum seletor de histórico encontrado! O bot pode congelar.")
         driver.switch_to.default_content()
         return None, None 
 
@@ -201,26 +205,32 @@ def process_login(driver):
     else:
         driver.get(LINK_AVIATOR)
         print("ℹ️ Indo direto para o Aviator via link.")
-    sleep(10) 
+    
+    # ⬆️ AUMENTADO O TEMPO DE ESPERA para garantir o carregamento do histórico
+    sleep(15) 
     
     return True
 
 def start_driver():
-    """Inicializa o driver do Chrome (Ajustado para Square Cloud/ambiente Linux)."""
+    """
+    Inicializa o driver do Chrome.
+    ⚠️ CORRIGIDO: Adaptado para a Square Cloud, usando o ChromeDriver instalado via APT
+    """
     options = webdriver.ChromeOptions()
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-extensions")
     options.add_argument("--disable-popup-blocking")
     options.add_argument("--disable-blink-features=AutomationControlled")
-    # NECESSÁRIO para rodar em servidores sem interface gráfica (ambiente headless)
+    # NECESSÁRIO para servidores sem interface gráfica
     options.add_argument("--headless") 
-    options.add_argument("--window-size=1920,1080") 
+    options.add_argument("--window-size=1920,1080")
     
-    # ⚠️ Aponta para o local onde o `chromium-chromedriver` é instalado pelo APT
+    # ⚠️ Aponta para o local onde o `chromium-chromedriver` é instalado pelo APT (square.json)
     service = Service("/usr/lib/chromium-browser/chromedriver") 
-
+    
     return webdriver.Chrome(service=service, options=options)
+
 
 # =============================================================
 # 🚀 LOOP PRINCIPAL
@@ -299,6 +309,7 @@ def start_bot(relogin_done_for: date = None):
                     return start_bot() 
 
             # === LEITURA DOS RESULTADOS ===
+            # O timeout de 7 segundos em initialize_game_elements pode ter sido a causa do congelamento
             resultados_texto = hist.text.strip() if hist else ""
             if not resultados_texto:
                 falhas += 1
