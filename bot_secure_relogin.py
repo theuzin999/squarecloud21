@@ -3,6 +3,8 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
+# ⚠️ REMOVIDO: from webdriver_manager.chrome import ChromeDriverManager 
+# (Em ambiente Cloud, usamos o caminho local do ChromeDriver)
 from time import sleep, time
 from datetime import datetime, date
 from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
@@ -52,6 +54,7 @@ TZ_BR = pytz.timezone("America/Sao_Paulo")
 # 🔧 FUNÇÕES AUXILIARES
 # =============================================================
 def getColorClass(value):
+    """Retorna a cor conforme o multiplicador."""
     m = float(value)
     if 1.0 <= m < 2.0:
         return "blue-bg"
@@ -62,6 +65,7 @@ def getColorClass(value):
     return "default-bg"
 
 def safe_click(driver, by, value, timeout=5):
+    """Tenta clicar em um elemento de forma segura."""
     try:
         el = WebDriverWait(driver, timeout).until(EC.element_to_be_clickable((by, value)))
         el.click()
@@ -70,24 +74,30 @@ def safe_click(driver, by, value, timeout=5):
         return False
 
 def safe_find(driver, by, value, timeout=5):
+    """Tenta encontrar um elemento de forma segura."""
     try:
         return WebDriverWait(driver, timeout).until(EC.presence_of_element_located((by, value)))
     except Exception:
         return None
 
-# =============================================================
-# 🔎 LOCALIZA IFRAME + HISTÓRICO (com retry incremental)
-# =============================================================
+
 def initialize_game_elements(driver):
-    """Localiza iframe e histórico do Aviator de forma robusta para ambiente cloud."""
+    """Localiza iframe e histórico do Aviator."""
     POSSIVEIS_IFRAMES = [
         '//iframe[contains(@src, "/aviator/")]',
         '//iframe[contains(@src, "spribe")]',
         '//iframe[contains(@src, "aviator-game")]'
     ]
-    # prioriza o seletor que você confirmou nos logs
+    
+    # =============================================================
+    # ⚠️ OTIMIZAÇÃO CRÍTICA DO DELAY ⚠️
+    # Movendo o seletor que funcionou (.result-history) para o topo.
+    # =============================================================
     POSSIVEIS_HISTORICOS = [
+        # 1. O SELETOR QUE FUNCIONOU NO SEU LOG:
         ('.result-history', By.CSS_SELECTOR),
+        
+        # 2. OUTROS SELETORES (Fallback)
         ('.round-history-button-1-x', By.CSS_SELECTOR),
         ('.rounds-history', By.CSS_SELECTOR),
         ('.history-list', By.CSS_SELECTOR),
@@ -99,15 +109,17 @@ def initialize_game_elements(driver):
         ('ul.results-list', By.CSS_SELECTOR),
         ('div.history-block', By.CSS_SELECTOR),
         ('div[class*="history-container"]', By.CSS_SELECTOR),
-        ('//div[contains(@class, "history")]', By.XPATH),
+        ('//div[contains(@class, "history")]', By.XPATH), # Este também funcionou, mas o CSS é mais rápido
         ('//div[contains(@class, "rounds-list")]', By.XPATH)
     ]
+    # =============================================================
 
     iframe = None
     for xpath in POSSIVEIS_IFRAMES:
         try:
-            driver.switch_to.default_content()
-            iframe = WebDriverWait(driver, 10).until(
+            driver.switch_to.default_content() 
+            # ⬇️ REDUZIDO O TIMEOUT (para falhar mais rápido se o iframe demorar)
+            iframe = WebDriverWait(driver, 7).until(
                 EC.presence_of_element_located((By.XPATH, xpath))
             )
             driver.switch_to.frame(iframe)
@@ -118,12 +130,12 @@ def initialize_game_elements(driver):
 
     if not iframe:
         print("⚠️ Nenhum iframe encontrado. Verifique se o jogo está carregado.")
-        return None, None
+        return None, None 
 
-    # 1) Tentativa rápida: até 5s
     historico_elemento = None
     for selector, by_method in POSSIVEIS_HISTORICOS:
         try:
+            # ⬇️ REDUZIDO O TIMEOUT (para falhar mais rápido se o seletor demorar)
             historico_elemento = WebDriverWait(driver, 5).until(
                 EC.presence_of_element_located((by_method, selector))
             )
@@ -132,33 +144,12 @@ def initialize_game_elements(driver):
         except Exception:
             continue
 
-    # 2) Cloud é mais lenta: retry incremental até 60s sem travar
     if not historico_elemento:
-        print("ℹ️ Histórico não visível ainda. Ativando busca incremental de até 60s...")
-        deadline = time() + 60
-        while time() < deadline and not historico_elemento:
-            for selector, by_method in POSSIVEIS_HISTORICOS:
-                try:
-                    if by_method == By.CSS_SELECTOR:
-                        found = driver.find_elements(By.CSS_SELECTOR, selector)
-                    else:
-                        found = driver.find_elements(By.XPATH, selector)
-                    if found:
-                        historico_elemento = found[0]
-                        print(f"✅ Histórico detectado com busca incremental: {selector}")
-                        break
-                except Exception:
-                    continue
-            if historico_elemento:
-                break
-            sleep(0.5)
-
-    if not historico_elemento:
-        print("❌ Nenhum seletor de histórico encontrado após 60s.")
+        print("⚠️ Nenhum seletor de histórico encontrado! O bot pode congelar.")
         driver.switch_to.default_content()
-        return None, None
+        return None, None 
 
-    return iframe, historico_elemento
+    return iframe, historico_elemento 
 
 # =============================================================
 # 🔑 FLUXO DE LOGIN E NAVEGAÇÃO
@@ -195,16 +186,18 @@ def process_login(driver):
         pass_input.clear()
         pass_input.send_keys(PASSWORD)
         sleep(0.5)
+        
+        # 4. Clica no botão final de login
         if safe_click(driver, By.CSS_SELECTOR, "a[login-btn].btn-small.btn-color-2.full-width.w-inline-block", 5):
             print("✅ Credenciais preenchidas e login confirmado.")
-            sleep(5)
+            sleep(5) 
         else:
             print("❌ Botão final de login não encontrado ou falha ao clicar.")
             return False
     else:
         print("⚠️ Campos de login não encontrados!")
         return False
-
+        
     # 5. Aceita cookies
     safe_click(driver, By.XPATH, "//button[contains(., 'Aceitar')]", 4)
     print("✅ Cookies aceitos (se aplicável).")
@@ -216,17 +209,16 @@ def process_login(driver):
     else:
         driver.get(LINK_AVIATOR)
         print("ℹ️ Indo direto para o Aviator via link.")
-
-    # Em cloud manter uma janela de respiro para o provider preparar o iframe
-    sleep(12)
+        
+    # ⬆️ MANTIDO O TEMPO DE ESPERA ALTO (15s) para o jogo carregar antes da busca
+    sleep(15) 
+    
     return True
 
-# =============================================================
-# 🧭 DRIVER (headless cloud) + micro otimizações
-# =============================================================
 def start_driver():
     """
-    Inicializa o driver do Chrome para Square Cloud (headless).
+    Inicializa o driver do Chrome.
+    ⚠️ CRÍTICO: Adaptado para a Square Cloud, usando o ChromeDriver instalado via APT.
     """
     options = webdriver.ChromeOptions()
     options.add_argument("--no-sandbox")
@@ -234,15 +226,15 @@ def start_driver():
     options.add_argument("--disable-extensions")
     options.add_argument("--disable-popup-blocking")
     options.add_argument("--disable-blink-features=AutomationControlled")
-    options.add_argument("--headless")
+    # NECESSÁRIO para servidores sem interface gráfica
+    options.add_argument("--headless") 
     options.add_argument("--window-size=1920,1080")
-    # menos carga: imagens off
-    options.add_argument("--blink-settings=imagesEnabled=false")
-
-    # Caminho padrão do Chromium/ChromeDriver na Square Cloud
-    service = Service("/usr/lib/chromium-browser/chromedriver")
-
+    
+    # ⚠️ CRÍTICO: Usando o caminho local da Square Cloud
+    service = Service("/usr/lib/chromium-browser/chromedriver") 
+    
     return webdriver.Chrome(service=service, options=options)
+
 
 # =============================================================
 # 🚀 LOOP PRINCIPAL
@@ -251,14 +243,15 @@ def start_bot(relogin_done_for: date = None):
     print("\n==============================================")
     print("         INICIALIZANDO GOATHBOT")
     print("==============================================")
-
+    
     driver = start_driver()
-
+    
     # === FLUXO DE INICIALIZAÇÃO E RECONEXÃO ===
     def setup_game(driver):
         if not process_login(driver):
             return None, None
-        iframe, hist = initialize_game_elements(driver)
+        
+        iframe, hist = initialize_game_elements(driver) 
         if not hist:
             print("❌ Não conseguiu iniciar o jogo. Tentando novamente...")
             return None, None
@@ -268,13 +261,14 @@ def start_bot(relogin_done_for: date = None):
 
     if not hist:
         driver.quit()
-        return start_bot()
+        # Chama a si mesma para tentar novamente do zero em caso de falha inicial
+        return start_bot() 
 
     LAST_SENT = None
-    ULTIMO_ENVIO = time()
-    ULTIMO_MULTIPLIER_TIME = time()
+    ULTIMO_ENVIO = time() 
+    ULTIMO_MULTIPLIER_TIME = time() 
     falhas = 0
-    relogin_done_for = relogin_done_for if relogin_done_for else date.today()
+    relogin_done_for = relogin_done_for if relogin_done_for else date.today() 
 
     print("✅ Captura iniciada.\n")
 
@@ -282,44 +276,55 @@ def start_bot(relogin_done_for: date = None):
         try:
             now_br = datetime.now(TZ_BR)
 
-            # Reinício diário às 23:59 BR
+            # === REINÍCIO PROGRAMADO DIÁRIO (23:59 BR) ===
+            # Verifica se é 23:59 (ou maior) e se o reinício ainda não foi feito hoje
             if now_br.hour == 23 and now_br.minute >= 59 and (relogin_done_for != now_br.date()):
                 print(f"🕛 REINÍCIO PROGRAMADO: Fechando bot às {now_br.strftime('%H:%M:%S')} para reabrir após 00:00.")
                 driver.quit()
+                
+                # O BOT FICARÁ OFFLINE POR 60 SEGUNDOS
                 print("💤 Bot offline por 1 minuto... (Reiniciando em 00:00:xx)")
-                sleep(60)
-                return start_bot(relogin_done_for=now_br.date())
+                sleep(60) 
+                
+                # Reinicia o script, atualizando o dia para evitar repetição
+                return start_bot(relogin_done_for=now_br.date()) 
+            # =========================================
 
-            # Inatividade > 6 min
+            # === VERIFICAÇÃO DE INATIVIDADE (6 MIN) ===
             if (time() - ULTIMO_MULTIPLIER_TIME) > TEMPO_MAX_INATIVIDADE:
-                print(f"🚨 Inatividade > 6min. Reiniciando...")
-                driver.quit()
-                return start_bot()
+                 print(f"🚨 Inatividade por mais de 6 minutos! Último envio em: {datetime.fromtimestamp(ULTIMO_MULTIPLIER_TIME).strftime('%H:%M:%S')}. Reiniciando o bot...")
+                 driver.quit()
+                 # Reinicia o script do zero
+                 return start_bot()
+            # =========================================
 
-            # Garante contexto no iframe
+
+            # === GARANTE QUE ESTAMOS NO IFRAME ANTES DE LER ===
             try:
-                driver.switch_to.frame(iframe)
+                # O switch_to.frame deve ocorrer antes de acessar hist
+                driver.switch_to.frame(iframe) 
             except Exception:
+                # Se falhar, tenta restabelecer o iframe e hist
                 driver.switch_to.default_content()
-                iframe, hist = initialize_game_elements(driver)
+                iframe, hist = initialize_game_elements(driver) 
                 if not hist:
-                    print("⚠️ Iframe/Histórico perdido. Reiniciando o bot...")
+                    print("⚠️ Falha crítica: Iframe/Histórico perdido. Reiniciando o bot...")
                     driver.quit()
-                    return start_bot()
+                    return start_bot() 
 
-            # Leitura dos resultados
+            # === LEITURA DOS RESULTADOS ===
             resultados_texto = hist.text.strip() if hist else ""
             if not resultados_texto:
                 falhas += 1
                 if falhas > 5:
-                    print("⚠️ 5 falhas seguidas. Re-inicializando elementos...")
+                    print("⚠️ Mais de 5 falhas de leitura. Tentando re-inicializar elementos...")
                     driver.switch_to.default_content()
                     iframe, hist = initialize_game_elements(driver)
                     falhas = 0
                 sleep(1)
                 continue
-
-            falhas = 0
+            
+            falhas = 0 # Se leu com sucesso, zera as falhas
 
             resultados = []
             seen = set()
@@ -334,37 +339,41 @@ def start_bot(relogin_done_for: date = None):
                 except ValueError:
                     pass
 
-            # Envio para Firebase
+            # === ENVIO PARA FIREBASE ===
             if resultados:
-                novo = resultados[0]
+                novo = resultados[0] 
                 if (novo != LAST_SENT) and ((time() - ULTIMO_ENVIO) > INTERVALO_MINIMO_ENVIO):
-                    now = datetime.now().astimezone(TZ_BR)
-                    raw = f"{novo:.2f}"
-                    date_str = now.strftime("%Y-%m-%d")
-                    time_key = now.strftime("%H-%M-%S.%f")
-                    time_display = now.strftime("%H:%M:%S")
-                    color = getColorClass(novo)
+                    
+                    now = datetime.now()
+                    now_br = now.astimezone(TZ_BR)
 
+                    raw = f"{novo:.2f}"
+                    date_str = now_br.strftime("%Y-%m-%d")
+                    time_key = now_br.strftime("%H-%M-%S.%f")
+                    time_display = now_br.strftime("%H:%M:%S")
+                    color = getColorClass(novo)
+                    
                     entry_key = f"{date_str}_{time_key}_{raw}x".replace(':', '-').replace('.', '-')
                     entry = {"multiplier": raw, "time": time_display, "color": color, "date": date_str}
-
+                    
                     try:
                         db.reference(f"history/{entry_key}").set(entry)
                         print(f"🔥 {raw}x salvo às {time_display}")
                     except Exception as e:
                         print("⚠️ Erro ao salvar:", e)
-
+                        
                     LAST_SENT = novo
                     ULTIMO_ENVIO = time()
-                    ULTIMO_MULTIPLIER_TIME = time()
-
-            # Mantém foco no iframe durante polling
+                    ULTIMO_MULTIPLIER_TIME = time() # Reseta o timer de inatividade
+            
+            # Mantenha o foco no iframe durante o polling.
             sleep(POLLING_INTERVAL)
 
         except (StaleElementReferenceException, TimeoutException):
             print("⚠️ Elemento histórico obsoleto/sumiu. Recarregando elementos...")
             iframe, hist = initialize_game_elements(driver)
             continue
+
         except Exception as e:
             print(f"❌ Erro inesperado: {e}")
             sleep(3)
@@ -377,4 +386,5 @@ if __name__ == "__main__":
     if not EMAIL or not PASSWORD:
         print("\n❗ Configure as variáveis de ambiente EMAIL e PASSWORD ou defina-as diretamente no código.")
     else:
+        # Chama a função inicial com o dia atual para controle do reinício
         start_bot(relogin_done_for=date.today())
